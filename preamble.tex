@@ -1,0 +1,155 @@
+%>>>>>>>>>>>>>>>>>> ПРЕАМБУЛА >>>>>>>>>>>>>>>>>>>>
+\documentclass[14pt,final,oneside]{extreport}% класс документа, характеристики
+%>>>>> Разметка документа
+\usepackage[a4paper, mag=1000, left=3cm, right=1.5cm, top=2cm, bottom=2cm, headsep=0.7cm, footskip=1cm]{geometry} % По ГОСТу: left>=3cm, right=1cm, top=2cm, bottom=2cm,
+\linespread{1} % межстройчный интервал по ГОСТу := 1.5
+%<<<<< Разметка документа
+
+%>>>>> babel c языковым пакетом НЕ должны быть первым импортируемым пакетом
+\usepackage[utf8]{inputenc}
+\usepackage[T1,T2A]{fontenc}
+\usepackage[russian]{babel}
+%<<<<<
+\usepackage{amsmath, amssymb}
+\usepackage{siunitx}
+\usepackage{enumitem}
+\usepackage{geometry}
+\usepackage{caption}
+
+%>>>...>> прочие полезные пакеты
+\usepackage{amsmath,amsthm,amssymb}
+\usepackage{mathtext}
+\usepackage{braket}
+\usepackage{indentfirst}
+\usepackage{graphicx}
+\usepackage{float}
+\graphicspath{{/home/ivan/itmo/informatics/latex}}
+\DeclareGraphicsExtensions{.pdf,.png,.jpg}
+%\usepackage{bookmark}
+\usepackage{courier}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{hyperref}  % Использование ссылок
+\hypersetup{%  % Настройка разметки ссылок
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=magenta,
+    %pdftitle={Overleaf Example},
+    %pdfpagemode=FullScreen,
+}
+\usepackage{pgfplots}
+
+\usepackage{multicol} 
+\usepackage[table]{xcolor}
+
+\setlength{\columnsep}{.15\textwidth} 
+\usepackage{listings} 
+\usepackage{caption}
+\DeclareCaptionFont{white}{\color{white}} 
+\DeclareCaptionFormat{listing}{\colorbox{gray}{\parbox{\textwidth}{#1#2#3}}}
+
+
+\makeatletter
+\newcommand{\iffby}[2][]{\ext@arrow 0359\Rightarrowfill@{#1}{#2}}% равносильность с надписью
+\makeatother
+
+
+
+
+\newcommand\Section[1]{
+    % Принимает 1 аргумент - название секции
+    \refstepcounter{section}
+    \section*{%
+        \raggedright
+        % Отключена дополнительная нумерация chapter в section в тексте документа:
+        % \arabic{chapter}.\arabic{section}. #1}
+        % Отключена любая нумарация section в тексте документа: 
+        \arabic{section}. #1%
+    }
+    
+    % Отключена дополнительная нумерация chapter в section в toc (table of contents) Оглавлении (Содержании):
+    % \addcontentsline{toc}{section}{\arabic{chapter}.\arabic{section}. #1}
+    \addcontentsline{toc}{section}{\arabic{section}. #1} 
+}
+
+\newcommand\Chapter[3]{%
+    % Принимает 3 аргумента - название главы и дополнительный заголовок и множитель ширины загловка (можно ничего)
+    \refstepcounter{chapter}%
+    \chapter*{%
+        %\hfill % заполнение отступом пространства до заголовка
+        \begin{minipage}{#3\textwidth} % Можно изменить ширину министраницы (заголовка)
+            \flushleft % Выранивание заголовка по левому краю параграфа (заголовка)
+            %\flushright % Выранивание заголовка по правому краю параграфа (заголовка)
+            \begin{huge}%
+                % Отключена нумерация глав в тексте:
+                % \textbf{\chaptername\ \arabic{chapter}\\}
+                \textbf{#1}% Первый заголовок
+            \end{huge}%
+            \\% Перенос сторки
+            \begin{Huge}
+                #2% Второй заголовок
+            \end{Huge}
+        \end{minipage}
+    }%
+    % Отключена нумерация для chapter в toc (table of contents), т.е. Оглавлении (Содержании):
+    % \addcontentsline{toc}{chapter}{\arabic{chapter}. #1}
+    % Представление главы в содержании:
+    \addcontentsline{toc}{chapter}{#1. #2}%
+}
+\newcommand\Subsection[1]{
+    % Принимает 1 аргумент - название подсекции
+    \refstepcounter{subsection}
+    \subsection*{%
+        \raggedright%
+        % Отключена дополнительная нумерация chapter в section в тексте документа (можно добавить отступ с помощью :
+        % \arabic{chapter}.\arabic{section}.\arabic{subsection}. #1}
+        \hspace*{12pt}
+        \arabic{section}. \arabic{subsection}. #1
+    }
+    % Отключена дополнительная нумерация chapter в section в Оглавлении (Содержании):
+    %\addcontentsline{toc}{subsection}{\arabic{chapter}.\arabic{section}.\arabic{subsection}. #1}
+    \addcontentsline{toc}{subsection}{\arabic{subsection}. #1}
+}
+\newcommand\Subsubsection[1]{
+    % Принимает 1 аргумент - название подсекции
+    \refstepcounter{subsubsection}
+    \subsubsection*{%
+        \raggedright%
+        % Отключена дополнительная нумерация chapter в section в тексте документа (можно добавить отступ с помощью :
+        % \arabic{chapter}.\arabic{section}.\arabic{subsection}. #1}
+        \hspace*{12pt}
+        \arabic{section}. \arabic{subsection}. \arabic{subsubsection}. #1
+    }
+    % Отключена дополнительная нумерация chapter в section в Оглавлении (Содержании):
+    %\addcontentsline{toc}{subsection}{\arabic{chapter}.\arabic{section}.\arabic{subsection}. #1}
+    \addcontentsline{toc}{subsubsection}{\arabic{subsubsection}. #1}
+}
+
+
+\lstdefinestyle{customasm}{
+    belowcaptionskip=1\baselineskip,
+    frame=single, 
+    frameround=tttt,
+    xleftmargin=\parindent,
+    language=[x86masm]Assembler,
+    basicstyle=\footnotesize\ttfamily,
+    commentstyle=\itshape\color{green!60!black},
+    keywordstyle=\color{blue!80!black},
+    identifierstyle=\color{red!80!black},
+    tabsize=4,
+    numbers=left,
+    numbersep=8pt,
+    stepnumber=1,
+    numberstyle=\tiny\color{gray}, 
+    columns = fullflexible,
+    morekeywords={ORG, LD, ST, POP, SWAB, JUMP, BEQ, SXTB, CLA}
+}
+
+
+
+
+
+
+
+
+
