@@ -1,9 +1,0 @@
-# Fdb version 4
-["pdflatex"] 0 "c:/labs/phys_project/Physics_project/preamble.tex" "preamble.pdf" "preamble" 0 -1
-  "c:/labs/phys_project/Physics_project/preamble.tex" 0 -1 0 ""
-  "preamble.aux" 0 -1 0 "pdflatex"
-  (generated)
-  "preamble.aux"
-  "preamble.log"
-  "preamble.pdf"
-  (rewritten before read)
