@@ -46,9 +46,9 @@ C5 = "#6A1B9A"   # фиолетовый
 # ДАННЫЕ
 # ══════════════════════════════════════════════════════════════════════
 distances_cm = [0, 5, 8, 10, 14, 20]
-B_uT         = [1000.0, 18.2, 11.4, 9.1, 6.5, 4.5]
+B_uT         = [2000.0, 36.4, 22.8, 18.2, 13.0, 9.0]
 
-conditions       = ["Без помех", "EMI-режим A", "EMI-режим B"]
+conditions       = ["Без помех", "ЭМП-режим A", "ЭМП-режим B"]
 utp_throughput   = [98.892, 95.829, 95.670]
 stp_throughput   = [99.152, 98.921, 98.192]
 utp_loss         = [0.496,  3.451,  3.488]
@@ -85,12 +85,12 @@ labels_v     = [s["label"] for s in pwm_steps]
 fig, ax = plt.subplots(figsize=(8, 4.5))
 
 mu0    = 4 * np.pi * 1e-7
-I      = 4.55
+I      = 9.09
 r_cont = np.linspace(0.01, 0.22, 400)
 B_cont = (mu0 * I / (2 * np.pi * r_cont)) * 1e6
 
 ax.plot(r_cont * 100, B_cont, color=C1, linewidth=2,
-        label=r"$B = \mu_0 I\,/\,(2\pi r)$,  $I = 4{,}55$ А")
+        label=r"$B = \mu_0 I\,/\,(2\pi r)$,  $I = 9{,}09$ А")
 ax.scatter(distances_cm[1:], B_uT[1:], color=C2, s=60, zorder=5,
            edgecolors="#333", linewidths=0.6,
            label="Расчётные значения (таблица расчёта)")
@@ -245,7 +245,7 @@ print("[OK] Fig5_AXT")
 
 
 # ══════════════════════════════════════════════════════════════════════
-# Рис. 6: 3D — EMI × частота × packet loss
+# Рис. 6: 3D — ЭМП × частота × packet loss
 # ══════════════════════════════════════════════════════════════════════
 fig = plt.figure(figsize=(9, 6))
 ax  = fig.add_subplot(111, projection="3d")
@@ -287,7 +287,7 @@ print("[OK] Fig6_3D_loss")
 
 
 # ══════════════════════════════════════════════════════════════════════
-# Рис. 7: 3D — EMI × частота × throughput
+# Рис. 7: 3D — ЭМП × частота × throughput
 # ══════════════════════════════════════════════════════════════════════
 fig = plt.figure(figsize=(9, 6))
 ax  = fig.add_subplot(111, projection="3d")
