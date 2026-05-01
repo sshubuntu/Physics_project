@@ -58,9 +58,9 @@ stp_rtt          = [8.847,  8.848,  8.847]
 utp_jitter       = [0.0012, 0.0012, 0.0014]
 stp_jitter       = [0.0001, 0.0013, 0.0023]
 
-n_links      = [1, 2, 3, 4, 5, 6, 7]
-total_speed  = [8.11, 17.61, 18.23, 18.45, 20.56, 21.34, 21.25]
-theoretical  = [n * 10 for n in n_links]
+n_links      = [1, 2, 3, 4]
+utp_speed    = [941, 937, 928, 912]
+stp_speed    = [941, 940, 939, 938]
 
 pwm_steps = [
         {"label": "Без помех", "freq": 0,     "emi_mv": 1.2,  "throughput": 98.9, "loss": 0.50},
@@ -207,36 +207,33 @@ print("[OK] Fig4_jitter")
 
 
 # ══════════════════════════════════════════════════════════════════════
-# Рис. 5: AXT — throughput vs N кабелей
+# Рис. 5: AXT — пропускная способность vs число активных кабелей
 # ══════════════════════════════════════════════════════════════════════
-fig, ax = plt.subplots(figsize=(8, 4.5))
+fig, ax = plt.subplots(figsize=(7, 4.5))
 
-ax.plot(n_links, theoretical, color="#888888", linewidth=1.5,
-        linestyle="--", marker="s", markersize=5,
-        label="Теоретический максимум ($N \\times 10$ Гбит/с)")
-ax.plot(n_links, total_speed, color=C1, linewidth=2,
-        marker="o", markersize=7, markerfacecolor="white",
-        markeredgewidth=1.5, label="Реальная скорость (iperf3)")
-ax.fill_between(n_links, total_speed, theoretical,
-                alpha=0.10, color=C2, label="Потери от AXT")
+x  = np.arange(len(n_links))
+w  = 0.35
+b1 = ax.bar(x - w/2, utp_speed, w, color=C1, alpha=0.85,
+            label="UTP Cat 5e", edgecolor="#333", linewidth=0.5)
+b2 = ax.bar(x + w/2, stp_speed, w, color=C2, alpha=0.75,
+            label="STP Cat 5e", edgecolor="#333", linewidth=0.5,
+            hatch="//")
 
-for n, ts in zip(n_links, total_speed):
-    eta = ts / (n * 10) * 100
-    ax.annotate(f"{eta:.0f}%", (n, ts),
-                textcoords="offset points", xytext=(0, 7),
-                fontsize=8, ha="center", color=C2)
+for bar in b1:
+    ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.8,
+            f"{bar.get_height():.0f}", ha="center", va="bottom", fontsize=8)
+for bar in b2:
+    ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.8,
+            f"{bar.get_height():.0f}", ha="center", va="bottom", fontsize=8)
 
-ax.axvspan(2.5, 7.5, alpha=0.04, color=C2)
-ax.text(3.2, 4, "Зона деградации\n(начиная с N = 3)",
-        fontsize=8, color=C2, style="italic")
-
-ax.set_xlabel("Число одновременно активных соединений $N$")
-ax.set_ylabel("Пропускная способность, Гбит/с")
-ax.set_title("Влияние плотности кабельной укладки (AXT) на суммарную пропускную способность\n"
-             "Cat 5e UTP, 60 м, стандарт 10GBASE-T")
-ax.set_xticks(n_links)
-ax.set_ylim(0, 78)
-ax.legend(loc="upper left")
+ax.set_xticks(x)
+ax.set_xticklabels(n_links)
+ax.set_xlabel("Число активных соседних кабелей")
+ax.set_ylabel("Пропускная способность, Мбит/с")
+ax.set_title("Влияние перекрёстных помех (AXT) на пропускную способность\n"
+             "Cat 5e, 2 м, 1000BASE-T")
+ax.set_ylim(900, 955)
+ax.legend()
 plt.tight_layout()
 plt.savefig("report_plots/Fig5_AXT.pdf")
 plt.savefig("report_plots/Fig5_AXT.png")
@@ -267,7 +264,7 @@ ax.set_xlabel("log₁₀(f ШИМ + 1)", labelpad=8)
 ax.set_ylabel("Уровень ЭМП, мВ",  labelpad=8)
 ax.set_zlabel("Потеря пакетов, %", labelpad=8)
 ax.set_title("Корреляция уровня ЭМП, частоты ШИМ-генератора\n"
-             "и потери пакетов (UTP Cat 5e)", pad=14)
+             "и потери пакетов", pad=14)
 
 cbar = fig.colorbar(sc, ax=ax, shrink=0.5, pad=0.1)
 cbar.set_label("Потеря пакетов, %")
@@ -307,7 +304,7 @@ ax.set_xlabel("log₁₀(f ШИМ + 1)", labelpad=8)
 ax.set_ylabel("Уровень ЭМП, мВ",  labelpad=8)
 ax.set_zlabel("Пропускная способность, Мбит/с", labelpad=8)
 ax.set_title("Корреляция уровня ЭМП, частоты ШИМ-генератора\n"
-             "и пропускной способности (UTP Cat 5e)", pad=14)
+             "и пропускной способности", pad=14)
 
 cbar2 = fig.colorbar(sc2, ax=ax, shrink=0.5, pad=0.1)
 cbar2.set_label("Пропускная способность, Мбит/с")
