@@ -1,0 +1,2 @@
+timestamp_utc,frequency_hz,duty_percent,duration_s,field_v_m,field_t,ping_avg_ms,packet_loss_percent,iperf_mbps,speedtest_download_mbps,speedtest_upload_mbps,raw_sensor_line,notes
+2026-05-01T08:10:15Z,10000,30,15,,,5.0,0.0,,,,,ok
