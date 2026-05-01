@@ -48,7 +48,7 @@ C5 = "#6A1B9A"   # фиолетовый
 distances_cm = [0, 5, 8, 10, 14, 20]
 B_uT         = [1000.0, 18.2, 11.4, 9.1, 6.5, 4.5]
 
-conditions       = ["Без помех", "NYYHY\n(220 В)", "NYM\n(220 В)"]
+conditions       = ["Без помех", "EMI-режим A", "EMI-режим B"]
 utp_throughput   = [98.892, 95.829, 95.670]
 stp_throughput   = [99.152, 98.921, 98.192]
 utp_loss         = [0.496,  3.451,  3.488]
@@ -63,7 +63,7 @@ total_speed  = [8.11, 17.61, 18.23, 18.45, 20.56, 21.34, 21.25]
 theoretical  = [n * 10 for n in n_links]
 
 pwm_steps = [
-    {"label": "Baseline", "freq": 0,     "emi_mv": 1.2,  "throughput": 98.9, "loss": 0.50},
+        {"label": "Без помех", "freq": 0,     "emi_mv": 1.2,  "throughput": 98.9, "loss": 0.50},
     {"label": "50 Гц",    "freq": 50,    "emi_mv": 4.1,  "throughput": 98.1, "loss": 0.82},
     {"label": "100 Гц",   "freq": 100,   "emi_mv": 6.3,  "throughput": 97.5, "loss": 1.15},
     {"label": "500 Гц",   "freq": 500,   "emi_mv": 9.8,  "throughput": 96.8, "loss": 1.73},
@@ -93,7 +93,7 @@ ax.plot(r_cont * 100, B_cont, color=C1, linewidth=2,
         label=r"$B = \mu_0 I\,/\,(2\pi r)$,  $I = 4{,}55$ А")
 ax.scatter(distances_cm[1:], B_uT[1:], color=C2, s=60, zorder=5,
            edgecolors="#333", linewidths=0.6,
-           label="Расчётные значения (таблица 1)")
+           label="Расчётные значения (таблица расчёта)")
 
 for d, b in zip(distances_cm[1:], B_uT[1:]):
     ax.annotate(f"{b} мкТл", (d, b),
@@ -141,7 +141,7 @@ for bar in b2:
 ax.set_xticks(x)
 ax.set_xticklabels(conditions)
 ax.set_ylabel("Пропускная способность, Мбит/с")
-ax.set_title("Throughput UTP и STP Cat 5e при воздействии ЭМП")
+ax.set_title("Пропускная способность UTP и STP Cat 5e при воздействии ЭМП")
 ax.set_ylim(94.5, 100.2)
 ax.legend()
 plt.tight_layout()
@@ -169,7 +169,7 @@ for bar in [*b1, *b2]:
 ax.set_xticks(x)
 ax.set_xticklabels(conditions)
 ax.set_ylabel("Потеря пакетов, %")
-ax.set_title("Packet Loss UTP и STP Cat 5e при воздействии ЭМП")
+ax.set_title("Потеря пакетов UTP и STP Cat 5e при воздействии ЭМП")
 ax.set_ylim(0, 4.2)
 ax.legend()
 plt.tight_layout()
@@ -197,7 +197,7 @@ for bar in [*b1, *b2]:
 ax.set_xticks(x)
 ax.set_xticklabels(conditions)
 ax.set_ylabel("Джиттер, мкс")
-ax.set_title("Jitter UTP и STP Cat 5e при воздействии ЭМП")
+ax.set_title("Джиттер UTP и STP Cat 5e при воздействии ЭМП")
 ax.legend()
 plt.tight_layout()
 plt.savefig("report_plots/Fig4_jitter.pdf")
@@ -305,12 +305,12 @@ for xp, yp, zp, lb in zip(log_freq, emi_vals, throughput_v, labels_v):
 
 ax.set_xlabel("log₁₀(f ШИМ + 1)", labelpad=8)
 ax.set_ylabel("Уровень ЭМП, мВ",  labelpad=8)
-ax.set_zlabel("Throughput, Мбит/с",labelpad=8)
+ax.set_zlabel("Пропускная способность, Мбит/с", labelpad=8)
 ax.set_title("Корреляция уровня ЭМП, частоты ШИМ-генератора\n"
              "и пропускной способности (UTP Cat 5e)", pad=14)
 
 cbar2 = fig.colorbar(sc2, ax=ax, shrink=0.5, pad=0.1)
-cbar2.set_label("Throughput, Мбит/с")
+cbar2.set_label("Пропускная способность, Мбит/с")
 
 ax.xaxis.pane.fill = False
 ax.yaxis.pane.fill = False
