@@ -171,6 +171,13 @@ MOSFET~+~индуктивная катушка. Параллельно с ген
   \end{tabular}
 \end{table}
 
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.9\textwidth]{report_plots/Fig1_B_vs_distance}
+  \caption{Зависимость магнитной индукции от расстояния до источника помех}
+  \label{fig:B_vs_distance}
+\end{figure}
+
 Данные расстояния выбраны не случайно: экспериментально установлено,
 что при нагрузке 2~кВт изменение сигнального напряжения
 в кабеле Cat~5e~UTP наблюдается на расстоянии менее 14~см
@@ -335,11 +342,54 @@ Delay (задержка) и Jitter (вариация задержки).
 Таким образом, экранирование снижает деградацию пропускной способности
 более чем в~3~раза.
 
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.9\textwidth]{report_plots/Fig2_throughput}
+  \caption{Сравнение пропускной способности UTP и STP при воздействии ЭМП}
+  \label{fig:qos_throughput}
+\end{figure}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.9\textwidth]{report_plots/Fig3_packet_loss}
+  \caption{Сравнение потерь пакетов UTP и STP при воздействии ЭМП}
+  \label{fig:qos_packet_loss}
+\end{figure}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.9\textwidth]{report_plots/Fig4_jitter}
+  \caption{Сравнение джиттера UTP и STP при воздействии ЭМП}
+  \label{fig:qos_jitter}
+\end{figure}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.95\textwidth]{report_plots/Fig6_3D_loss}
+  \caption{Корреляция уровня ЭМП, частоты ШИМ-генератора и потери пакетов}
+  \label{fig:emi_3d_loss}
+\end{figure}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.95\textwidth]{report_plots/Fig7_3D_throughput}
+  \caption{Корреляция уровня ЭМП, частоты ШИМ-генератора и пропускной способности}
+  \label{fig:emi_3d_throughput}
+\end{figure}
+
 \Subsection{Влияние плотности кабельной укладки на пропускную способность}
+
+В рамках проекта основной источник ЭМП задаётся управляемым
+генератором, однако в реальной кабельной инфраструктуре значимым
+фактором выступает внутренняя электромагнитная связь между
+параллельно уложенными линиями. Поэтому дополнительно оценено
+влияние плотной укладки кабелей как фонового источника помех,
+чтобы корректно интерпретировать деградацию сетевых параметров.
 
 При плотной прокладке нескольких кабелей возникает перекрёстная
 помеха между кабелями (Alien Crosstalk, AXT).
-Модель AXT между двумя разъёмами описывается выражением:
+Для ориентировочной оценки уровня AXT между двумя разъёмами
+используется выражение:
 
 \begin{equation}
   \mathrm{ANEXT}(f) = K_\text{ANEXT} - 15 \cdot \lg\!\left(\frac{f}{100}\right)
@@ -350,7 +400,8 @@ $K_\text{ANEXT} = 38{,}3$~дБ, $f$~--- частота в МГц.
 
 Результаты измерения суммарной пропускной способности
 при плотной укладке $N$ кабелей Cat~5e~UTP длиной 60~м
-(стандарт 10GBASE-T, iperf3) приведены в таблице~\ref{tab:axt}.
+в составе испытательного стенда (стандарт 10GBASE-T, \texttt{iperf3})
+приведены в таблице~\ref{tab:axt}.
 
 \begin{table}[h!]
   \centering
@@ -382,7 +433,16 @@ $7 \times 10 = 70$~Гбит/с. КПД использования канала:
 
 Начиная с $N \geq 3$ происходит автоматическое понижение скорости
 отдельных портов с 10~Гбит/с до 1~Гбит/с вследствие превышения
-порога коррекции ошибок встроенных LDPC-кодов.
+порога коррекции ошибок встроенных LDPC-кодов. Этот эффект
+характеризует вклад внутренней кабельной помехи и должен
+учитываться при сравнении с испытаниями от внешнего EMI-генератора.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.95\textwidth]{report_plots/Fig5_AXT}
+  \caption{Влияние плотности кабельной укладки (AXT) на суммарную пропускную способность}
+  \label{fig:axt_throughput}
+\end{figure}
 
 \Subsection{Пороговые значения помех}
 
