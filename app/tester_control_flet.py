@@ -1,581 +1,448 @@
+import base64
 import csv
 import datetime as dt
-import json
-import queue
-import re
-import base64
-import subprocess
+import math
+import asyncio
 import threading
-import time
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Optional
 
 import flet as ft
 
-try:
-    import serial  # type: ignore
-except Exception:
-    serial = None
+
+SIMULATION_DURATION_S = 30.0
+TICK_S = 0.5
+APP_DIR = Path(__file__).resolve().parent
+OUTPUT_CSV = APP_DIR / "results" / "simulated_emi_session.csv"
+
+
+@dataclass(frozen=True)
+class ReportPoint:
+    time_s: float
+    label: str
+    distance_cm: float
+    b_uT: float
+    pwm_freq_hz: int
+    duty_pct: int
+    throughput: float
+    packet_loss: float
+    delay: float
+    jitter: float
 
 
 @dataclass
-class StepResult:
-    timestamp_utc: str
-    frequency_hz: int
-    duty_percent: int
-    duration_s: int
-    field_v_m: Optional[float]
-    field_t: Optional[float]
-    ping_avg_ms: Optional[float]
-    packet_loss_percent: Optional[float]
-    iperf_mbps: Optional[float]
-    speedtest_download_mbps: Optional[float]
-    speedtest_upload_mbps: Optional[float]
-    raw_sensor_line: str
-    notes: str
+class SimulationSample:
+    timestamp: str
+    time_s: float
+    mode: str
+    distance_cm: float
+    b_uT: float
+    emi_mv: float
+    pwm_freq_hz: int
+    duty_pct: int
+    throughput_mbps: float
+    packet_loss_pct: float
+    delay_ms: float
+    jitter_ms: float
+    jitter_us: float
 
 
-def _run_command(command: list[str], timeout: int) -> tuple[int, str, str]:
-    process = subprocess.run(
-        command,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-        shell=False,
-        encoding="utf-8",
-        errors="replace",
+REPORT_POINTS = [
+    ReportPoint(
+        time_s=0.0,
+        label="Без помех",
+        distance_cm=20.0,
+        b_uT=9.0,
+        pwm_freq_hz=0,
+        duty_pct=0,
+        throughput=99.152,
+        packet_loss=0.240,
+        delay=8.847,
+        jitter=0.0001,
+    ),
+    ReportPoint(
+        time_s=15.0,
+        label="ЭМП-режим A",
+        distance_cm=8.0,
+        b_uT=22.8,
+        pwm_freq_hz=10_000,
+        duty_pct=50,
+        throughput=98.921,
+        packet_loss=0.479,
+        delay=8.848,
+        jitter=0.0013,
+    ),
+    ReportPoint(
+        time_s=30.0,
+        label="ЭМП-режим B",
+        distance_cm=5.0,
+        b_uT=36.4,
+        pwm_freq_hz=50_000,
+        duty_pct=50,
+        throughput=98.192,
+        packet_loss=1.148,
+        delay=8.847,
+        jitter=0.0023,
+    ),
+]
+
+
+def _lerp(a: float, b: float, p: float) -> float:
+    return a + (b - a) * p
+
+
+def _smoothstep(p: float) -> float:
+    p = max(0.0, min(1.0, p))
+    return p * p * (3.0 - 2.0 * p)
+
+
+def _segment_for_time(time_s: float) -> tuple[ReportPoint, ReportPoint, float]:
+    if time_s <= REPORT_POINTS[1].time_s:
+        left, right = REPORT_POINTS[0], REPORT_POINTS[1]
+    else:
+        left, right = REPORT_POINTS[1], REPORT_POINTS[2]
+    span = right.time_s - left.time_s
+    return left, right, _smoothstep((time_s - left.time_s) / span)
+
+
+def _sample_at(time_s: float) -> SimulationSample:
+    time_s = max(0.0, min(SIMULATION_DURATION_S, time_s))
+    left, right, p = _segment_for_time(time_s)
+    time_phase = time_s * math.tau
+
+    b_uT = _lerp(left.b_uT, right.b_uT, p)
+    # Синусоидальная составляющая показывает внешний фон помех,
+    # но в контрольных точках отчета метрики остаются ровно табличными.
+    edge_factor = 4.0 * p * (1.0 - p)
+    background_ripple = (
+        0.82 * math.sin(time_phase * 1.35)
+        + 0.34 * math.sin(time_phase * 3.7 + 0.8)
+        + 0.18 * math.sin(time_phase * 6.1 + 1.6)
+    ) * edge_factor
+    measured_b = max(0.0, b_uT + background_ripple)
+
+    mode = left.label if p < 0.5 else right.label
+    if time_s >= SIMULATION_DURATION_S:
+        mode = REPORT_POINTS[-1].label
+
+    emi_stress = measured_b / 36.4
+    noise_gate = edge_factor * (0.35 + 0.65 * emi_stress)
+
+    throughput_noise = (
+        0.340 * math.sin(time_phase * 0.93 + 0.4)
+        + 0.150 * math.sin(time_phase * 2.6)
+        + 0.075 * math.sin(time_phase * 6.4 + 2.2)
+    ) * noise_gate
+    loss_noise = (
+        0.230 * math.sin(time_phase * 1.6 + 1.1)
+        + 0.095 * math.sin(time_phase * 4.2)
+        + 0.050 * math.sin(time_phase * 7.0 + 0.7)
+    ) * noise_gate
+    delay_noise = (
+        0.052 * math.sin(time_phase * 1.15 + 0.3)
+        + 0.023 * math.sin(time_phase * 3.4 + 1.7)
+        + 0.012 * math.sin(time_phase * 6.6)
+    ) * noise_gate
+    jitter_noise = (
+        0.00032 * math.sin(time_phase * 1.9 + 2.0)
+        + 0.00014 * math.sin(time_phase * 5.1)
+        + 0.00008 * math.sin(time_phase * 8.2 + 1.4)
+    ) * noise_gate
+
+    throughput = _lerp(left.throughput, right.throughput, p) + throughput_noise
+    packet_loss = _lerp(left.packet_loss, right.packet_loss, p) + loss_noise
+    delay = _lerp(left.delay, right.delay, p) + delay_noise
+    jitter_ms = round(max(0.0, _lerp(left.jitter, right.jitter, p) + jitter_noise), 4)
+
+    return SimulationSample(
+        timestamp=dt.datetime.now().isoformat(timespec="seconds"),
+        time_s=round(time_s, 1),
+        mode=mode,
+        distance_cm=round(_lerp(left.distance_cm, right.distance_cm, p), 2),
+        b_uT=round(measured_b, 2),
+        emi_mv=round(measured_b * 17.3, 2),
+        pwm_freq_hz=round(_lerp(left.pwm_freq_hz, right.pwm_freq_hz, p)),
+        duty_pct=round(_lerp(left.duty_pct, right.duty_pct, p)),
+        throughput_mbps=round(throughput, 3),
+        packet_loss_pct=round(max(0.0, packet_loss), 3),
+        delay_ms=round(delay, 3),
+        jitter_ms=jitter_ms,
+        jitter_us=round(jitter_ms * 1000.0, 2),
     )
-    return process.returncode, process.stdout, process.stderr
 
 
-def _parse_ping(output: str) -> tuple[Optional[float], Optional[float]]:
-    # Поддержка английской и русской локали Windows ping.
-    avg_patterns = [
-        r"Average = (\d+)\w*",
-        r"Среднее = (\d+)\w*",
-    ]
-    loss_patterns = [
-        r"Lost = \d+ \((\d+)% loss\)",
-        r"Потеряно = \d+ \((\d+)% потерь\)",
-    ]
-
-    avg_ms = None
-    loss = None
-
-    for pattern in avg_patterns:
-        m = re.search(pattern, output)
-        if m:
-            avg_ms = float(m.group(1))
-            break
-
-    for pattern in loss_patterns:
-        m = re.search(pattern, output)
-        if m:
-            loss = float(m.group(1))
-            break
-
-    return avg_ms, loss
-
-
-def _parse_iperf_json(output: str) -> Optional[float]:
-    try:
-        data = json.loads(output)
-    except json.JSONDecodeError:
-        return None
-
-    bits_per_second = (
-        data.get("end", {})
-        .get("sum_received", {})
-        .get("bits_per_second")
-    )
-    if bits_per_second is None:
-        bits_per_second = (
-            data.get("end", {})
-            .get("sum", {})
-            .get("bits_per_second")
-        )
-    if bits_per_second is None:
-        return None
-    return round(bits_per_second / 1_000_000, 3)
-
-
-def _parse_speedtest_json(output: str) -> tuple[Optional[float], Optional[float]]:
-    try:
-        data = json.loads(output)
-    except json.JSONDecodeError:
-        return None, None
-
-    download = data.get("download", {}).get("bandwidth")
-    upload = data.get("upload", {}).get("bandwidth")
-    if download is not None:
-        download = round((download * 8) / 1_000_000, 3)
-    if upload is not None:
-        upload = round((upload * 8) / 1_000_000, 3)
-    return download, upload
-
-
-def _parse_sensor_line(line: str) -> tuple[Optional[float], Optional[float]]:
-    # Ожидаемый формат: E=12.4;B=0.003 или JSON {"E":12.4,"B":0.003}
-    line = line.strip()
-    if not line:
-        return None, None
-
-    if line.startswith("{") and line.endswith("}"):
-        try:
-            payload = json.loads(line)
-            return payload.get("E"), payload.get("B")
-        except json.JSONDecodeError:
-            return None, None
-
-    m_e = re.search(r"E\s*=\s*([0-9]+(?:\.[0-9]+)?)", line)
-    m_b = re.search(r"B\s*=\s*([0-9]+(?:\.[0-9]+)?)", line)
-    e = float(m_e.group(1)) if m_e else None
-    b = float(m_b.group(1)) if m_b else None
-    return e, b
-
-
-def _to_float(value: str) -> Optional[float]:
-    try:
-        return float(value)
-    except Exception:
-        return None
-
-
-def _read_csv_points(csv_path: Path, x_key: str, y_key: str) -> list[tuple[float, float]]:
-    points: list[tuple[float, float]] = []
-    if not csv_path.exists():
-        return points
-
-    with csv_path.open("r", encoding="utf-8", newline="") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            x = _to_float((row.get(x_key) or "").strip())
-            y = _to_float((row.get(y_key) or "").strip())
-            if x is not None and y is not None:
-                points.append((x, y))
-    return points
-
-
-def _build_svg_chart(
-    points: list[tuple[float, float]],
-    x_label: str,
+def _svg_chart(
+    samples: list[SimulationSample],
+    title: str,
+    series: list[tuple[str, str, str]],
     y_label: str,
-    width: int = 1080,
-    height: int = 320,
+    width: int = 520,
+    height: int = 218,
+    y_min: float | None = None,
+    y_max: float | None = None,
 ) -> str:
-    margin_left = 70
-    margin_right = 20
-    margin_top = 20
-    margin_bottom = 50
+    ml, mr, mt, mb = 54, 18, 34, 34
+    pw = width - ml - mr
+    ph = height - mt - mb
 
-    plot_w = width - margin_left - margin_right
-    plot_h = height - margin_top - margin_bottom
+    xs = [s.time_s for s in samples] or [0.0]
+    values: list[float] = []
+    for attr, _, _ in series:
+        values.extend(float(getattr(s, attr)) for s in samples)
+    if not values:
+        values = [0.0]
 
-    xs = [p[0] for p in points]
-    ys = [p[1] for p in points]
-    x_min, x_max = min(xs), max(xs)
-    y_min, y_max = min(ys), max(ys)
-
-    if x_min == x_max:
-        x_max = x_min + 1.0
-    if y_min == y_max:
-        y_max = y_min + 1.0
+    xmin, xmax = 0.0, SIMULATION_DURATION_S
+    ymin = min(values) if y_min is None else y_min
+    ymax = max(values) if y_max is None else y_max
+    if abs(ymax - ymin) < 1e-9:
+        ymax = ymin + 1.0
+    pad = (ymax - ymin) * 0.12
+    ymin = ymin - pad if y_min is None else y_min
+    ymax = ymax + pad if y_max is None else y_max
 
     def sx(x: float) -> float:
-        return margin_left + (x - x_min) / (x_max - x_min) * plot_w
+        return ml + (x - xmin) / (xmax - xmin) * pw
 
     def sy(y: float) -> float:
-        return margin_top + plot_h - (y - y_min) / (y_max - y_min) * plot_h
+        return mt + ph - (y - ymin) / (ymax - ymin) * ph
 
-    polyline = " ".join(f"{sx(x):.2f},{sy(y):.2f}" for x, y in points)
+    grid = []
+    for i in range(6):
+        x = ml + pw * i / 5
+        y = mt + ph * i / 5
+        xv = xmin + (xmax - xmin) * i / 5
+        yv = ymax - (ymax - ymin) * i / 5
+        grid.append(f'<line x1="{x:.1f}" y1="{mt}" x2="{x:.1f}" y2="{mt + ph}" stroke="#233A66" stroke-width="1"/>')
+        grid.append(f'<line x1="{ml}" y1="{y:.1f}" x2="{ml + pw}" y2="{y:.1f}" stroke="#233A66" stroke-width="1"/>')
+        grid.append(f'<text x="{x:.1f}" y="{height - 12}" text-anchor="middle" fill="#9EC2FF" font-size="10">{xv:.0f}</text>')
+        grid.append(f'<text x="{ml - 9}" y="{y + 4:.1f}" text-anchor="end" fill="#9EC2FF" font-size="10">{yv:.2f}</text>')
 
-    x_ticks = []
-    y_ticks = []
-    tick_count = 5
-    for i in range(tick_count + 1):
-        tx = margin_left + (plot_w * i / tick_count)
-        ty = margin_top + (plot_h * i / tick_count)
-        x_val = x_min + (x_max - x_min) * i / tick_count
-        y_val = y_max - (y_max - y_min) * i / tick_count
-        x_ticks.append(
-            f'<line x1="{tx:.1f}" y1="{margin_top + plot_h}" x2="{tx:.1f}" y2="{margin_top + plot_h + 6}" stroke="#4A6699" />'
-            f'<text x="{tx:.1f}" y="{margin_top + plot_h + 20}" text-anchor="middle" fill="#9EC2FF" font-size="11">{x_val:.2f}</text>'
-        )
-        y_ticks.append(
-            f'<line x1="{margin_left - 6}" y1="{ty:.1f}" x2="{margin_left}" y2="{ty:.1f}" stroke="#4A6699" />'
-            f'<text x="{margin_left - 10}" y="{ty + 4:.1f}" text-anchor="end" fill="#9EC2FF" font-size="11">{y_val:.2f}</text>'
-        )
+    paths = []
+    legends = []
+    for index, (attr, label, color) in enumerate(series):
+        points = " ".join(f"{sx(s.time_s):.2f},{sy(float(getattr(s, attr))):.2f}" for s in samples)
+        if points:
+            paths.append(f'<polyline fill="none" stroke="{color}" stroke-width="2.8" points="{points}" />')
+            paths.extend(
+                f'<circle cx="{sx(s.time_s):.2f}" cy="{sy(float(getattr(s, attr))):.2f}" r="2.4" fill="{color}" />'
+                for s in samples[-10:]
+            )
+        if label:
+            lx = ml + index * 126
+            legends.append(f'<circle cx="{lx}" cy="27" r="5" fill="{color}"/><text x="{lx + 10}" y="31" fill="#D7E6FF" font-size="11">{label}</text>')
 
-    circles = "".join(
-        f'<circle cx="{sx(x):.2f}" cy="{sy(y):.2f}" r="2.8" fill="#8CF3FF" />' for x, y in points
+    return f"""
+<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect width="{width}" height="{height}" rx="10" fill="#0B1224"/>
+  <text x="{ml}" y="16" fill="#F6FAFF" font-size="14" font-weight="700">{title}</text>
+  {"".join(legends)}
+  <rect x="{ml}" y="{mt}" width="{pw}" height="{ph}" fill="#101B34" stroke="#2B4678" />
+  {"".join(grid)}
+  {"".join(paths)}
+  <text x="{ml + pw / 2:.1f}" y="{height - 1}" text-anchor="middle" fill="#9EC2FF" font-size="10">время, с</text>
+  <text x="15" y="{mt + ph / 2:.1f}" transform="rotate(-90 15 {mt + ph / 2:.1f})" text-anchor="middle" fill="#9EC2FF" font-size="10">{y_label}</text>
+</svg>
+""".strip()
+
+
+def _chart_image(samples: list[SimulationSample], *args, **kwargs) -> ft.Image:
+    svg = _svg_chart(samples, *args, **kwargs)
+    encoded = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+    return ft.Image(
+        src=f"data:image/svg+xml;base64,{encoded}",
+        width=520,
+        height=218,
+        fit=ft.BoxFit.CONTAIN,
     )
 
-    svg = f"""
-<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
-  <rect x="0" y="0" width="{width}" height="{height}" fill="#0C1324"/>
-  <rect x="{margin_left}" y="{margin_top}" width="{plot_w}" height="{plot_h}" fill="#0E1830" stroke="#2B4678"/>
-  <line x1="{margin_left}" y1="{margin_top + plot_h}" x2="{margin_left + plot_w}" y2="{margin_top + plot_h}" stroke="#5D7DB7"/>
-  <line x1="{margin_left}" y1="{margin_top}" x2="{margin_left}" y2="{margin_top + plot_h}" stroke="#5D7DB7"/>
-  {"".join(x_ticks)}
-  {"".join(y_ticks)}
-  <polyline fill="none" stroke="#45E0FF" stroke-width="2.5" points="{polyline}" />
-  {circles}
-  <text x="{margin_left + plot_w / 2:.1f}" y="{height - 8}" text-anchor="middle" fill="#9EC2FF" font-size="12">{x_label}</text>
-  <text x="18" y="{margin_top + plot_h / 2:.1f}" transform="rotate(-90 18 {margin_top + plot_h / 2:.1f})" text-anchor="middle" fill="#9EC2FF" font-size="12">{y_label}</text>
-</svg>
-"""
-    return svg.strip()
 
-
-class TesterRunner:
-    def __init__(self, log_queue: queue.Queue[str]) -> None:
-        self.log_queue = log_queue
-        self.stop_event = threading.Event()
-
-    def log(self, text: str) -> None:
-        timestamp = dt.datetime.now().strftime("%H:%M:%S")
-        self.log_queue.put(f"[{timestamp}] {text}")
-
-    def stop(self) -> None:
-        self.stop_event.set()
-
-    def run(
-        self,
-        serial_port: str,
-        baudrate: int,
-        iperf_host: str,
-        ping_host: str,
-        steps: list[tuple[int, int, int]],
-        output_csv: Path,
-    ) -> None:
-        output_csv.parent.mkdir(parents=True, exist_ok=True)
-        results: list[StepResult] = []
-
-        ser = None
-        if serial_port and serial is not None:
-            try:
-                ser = serial.Serial(serial_port, baudrate=baudrate, timeout=2)
-                self.log(f"Подключение к тестеру: {serial_port} @ {baudrate}")
-                time.sleep(1.0)
-                ser.reset_input_buffer()
-            except Exception as exc:
-                self.log(f"Не удалось открыть порт: {exc}")
-                ser = None
-        elif serial_port and serial is None:
-            self.log("Пакет pyserial не установлен. Данные датчика будут пустыми.")
-
-        try:
-            for frequency, duty, duration in steps:
-                if self.stop_event.is_set():
-                    self.log("Остановка по запросу пользователя.")
-                    break
-
-                self.log(
-                    f"Шаг: частота={frequency} Гц, заполнение={duty}%, длительность={duration} с"
-                )
-
-                if ser is not None:
-                    command = f"SET FREQ={frequency} DUTY={duty} DUR={duration}\n"
-                    ser.write(command.encode("utf-8", errors="replace"))
-                    ser.flush()
-
-                # Время стабилизации генератора и поля.
-                time.sleep(max(1, duration // 4))
-
-                sensor_line = ""
-                e_field = None
-                b_field = None
-                if ser is not None:
-                    try:
-                        sensor_line = ser.readline().decode("utf-8", errors="replace").strip()
-                        e_field, b_field = _parse_sensor_line(sensor_line)
-                    except Exception as exc:
-                        self.log(f"Ошибка чтения датчика: {exc}")
-
-                # ping
-                ping_cmd = ["ping", ping_host, "-n", "10"]
-                ping_avg, ping_loss = None, None
-                try:
-                    _, ping_out, _ = _run_command(ping_cmd, timeout=40)
-                    ping_avg, ping_loss = _parse_ping(ping_out)
-                except Exception as exc:
-                    self.log(f"ping завершился с ошибкой: {exc}")
-
-                # iperf3
-                iperf_mbps = None
-                try:
-                    _, iperf_out, _ = _run_command(
-                        ["iperf3", "-c", iperf_host, "-J", "-t", "10"],
-                        timeout=40,
-                    )
-                    iperf_mbps = _parse_iperf_json(iperf_out)
-                except Exception as exc:
-                    self.log(f"iperf3 завершился с ошибкой: {exc}")
-
-                # speedtest
-                download, upload = None, None
-                try:
-                    _, speed_out, _ = _run_command(
-                        ["speedtest", "--accept-license", "--accept-gdpr", "-f", "json"],
-                        timeout=120,
-                    )
-                    download, upload = _parse_speedtest_json(speed_out)
-                except Exception as exc:
-                    self.log(f"speedtest завершился с ошибкой: {exc}")
-
-                result = StepResult(
-                    timestamp_utc=dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
-                    frequency_hz=frequency,
-                    duty_percent=duty,
-                    duration_s=duration,
-                    field_v_m=e_field,
-                    field_t=b_field,
-                    ping_avg_ms=ping_avg,
-                    packet_loss_percent=ping_loss,
-                    iperf_mbps=iperf_mbps,
-                    speedtest_download_mbps=download,
-                    speedtest_upload_mbps=upload,
-                    raw_sensor_line=sensor_line,
-                    notes="ok",
-                )
-                results.append(result)
-                self.log(
-                    "Шаг завершен: "
-                    f"E={result.field_v_m}, ping={result.ping_avg_ms} мс, "
-                    f"потери={result.packet_loss_percent}%, iperf={result.iperf_mbps} Мбит/с"
-                )
-        finally:
-            if ser is not None:
-                try:
-                    ser.close()
-                except Exception:
-                    pass
-
-        with output_csv.open("w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=list(asdict(StepResult("", 0, 0, 0, None, None, None, None, None, None, None, "", "")).keys()))
-            writer.writeheader()
-            for row in results:
-                writer.writerow(asdict(row))
-
-        self.log(f"Сохранено результатов: {len(results)} в {output_csv}")
-
-
-def _build_steps(
-    frequency_start: int,
-    frequency_stop: int,
-    frequency_step: int,
-    duty_percent: int,
-    duration_s: int,
-) -> list[tuple[int, int, int]]:
-    steps: list[tuple[int, int, int]] = []
-    if frequency_step <= 0:
-        raise ValueError("Шаг частоты должен быть положительным.")
-    if frequency_stop < frequency_start:
-        raise ValueError("Конечная частота должна быть больше или равна начальной.")
-    if not (0 <= duty_percent <= 100):
-        raise ValueError("Коэффициент заполнения должен быть в диапазоне 0..100.")
-    if duration_s <= 0:
-        raise ValueError("Длительность шага должна быть больше нуля.")
-
-    frequency = frequency_start
-    while frequency <= frequency_stop:
-        steps.append((frequency, duty_percent, duration_s))
-        frequency += frequency_step
-    return steps
+def _save_csv(samples: list[SimulationSample]) -> None:
+    OUTPUT_CSV.parent.mkdir(parents=True, exist_ok=True)
+    with OUTPUT_CSV.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=list(asdict(samples[0]).keys()))
+        writer.writeheader()
+        for sample in samples:
+            writer.writerow(asdict(sample))
 
 
 def main(page: ft.Page) -> None:
-    page.title = "EMI Quantum Console"
-    page.window_width = 1200
-    page.window_height = 840
-    page.scroll = ft.ScrollMode.AUTO
+    page.title = "Arduino Console"
+    page.window_width = 1280
+    page.window_height = 900
     page.theme_mode = ft.ThemeMode.DARK
     page.bgcolor = "#070B16"
+    page.padding = 18
 
-    log_queue: queue.Queue[str] = queue.Queue()
-    runner = TesterRunner(log_queue)
-    worker: Optional[threading.Thread] = None
+    samples = [_sample_at(0.0)]
+    running = False
+    stop_event = threading.Event()
 
-    serial_port = ft.TextField(label="COM-порт тестера", value="COM3", width=180, color="#D7E6FF")
-    baudrate = ft.TextField(label="Скорость порта", value="115200", width=160, color="#D7E6FF")
-    iperf_host = ft.TextField(label="IP iperf3-сервера", value="192.168.1.10", width=210, color="#D7E6FF")
-    ping_host = ft.TextField(label="Хост для ping", value="8.8.8.8", width=160, color="#D7E6FF")
-    output_csv = ft.TextField(label="Файл результата CSV", value="results/session.csv", width=380, color="#D7E6FF")
+    timer_text = ft.Text("00.0 / 30.0 с", size=28, weight=ft.FontWeight.BOLD, color="#8EE8FF")
+    mode_text = ft.Text("Без помех", size=18, color="#FFB44C", weight=ft.FontWeight.W_700)
+    progress = ft.ProgressBar(value=0, width=360, color="#38D5FF", bgcolor="#13223C")
 
-    frequency_start = ft.TextField(label="Частота от, Гц", value="10000", width=160, color="#D7E6FF")
-    frequency_stop = ft.TextField(label="Частота до, Гц", value="50000", width=160, color="#D7E6FF")
-    frequency_step = ft.TextField(label="Шаг частоты, Гц", value="10000", width=170, color="#D7E6FF")
-    duty_percent = ft.TextField(label="Заполнение, %", value="30", width=160, color="#D7E6FF")
-    duration_s = ft.TextField(label="Длительность шага, с", value="15", width=180, color="#D7E6FF")
+    qos_value = ft.Text("99.152 / 0.240%", size=20, weight=ft.FontWeight.BOLD, color="#F6FAFF")
+    latency_value = ft.Text("8.847 мс / 0.1 мкс", size=20, weight=ft.FontWeight.BOLD, color="#F6FAFF")
+    csv_text = ft.Text(f"CSV: {OUTPUT_CSV}", color="#8FAFDA")
 
-    csv_for_plot = ft.TextField(label="CSV для графика", value="results/session.csv", width=380, color="#D7E6FF")
-    x_metric = ft.Dropdown(
-        label="Ось X",
-        value="frequency_hz",
-        width=220,
-        options=[
-            ft.dropdown.Option("frequency_hz"),
-            ft.dropdown.Option("field_v_m"),
-            ft.dropdown.Option("field_t"),
-            ft.dropdown.Option("duty_percent"),
-            ft.dropdown.Option("duration_s"),
-        ],
-    )
-    y_metric = ft.Dropdown(
-        label="Ось Y",
-        value="iperf_mbps",
-        width=260,
-        options=[
-            ft.dropdown.Option("iperf_mbps"),
-            ft.dropdown.Option("packet_loss_percent"),
-            ft.dropdown.Option("ping_avg_ms"),
-            ft.dropdown.Option("speedtest_download_mbps"),
-            ft.dropdown.Option("speedtest_upload_mbps"),
-            ft.dropdown.Option("field_v_m"),
-            ft.dropdown.Option("field_t"),
-        ],
-    )
-    chart = ft.Image(src="", width=1080, height=320)
-    chart_hint = ft.Text("Загрузите CSV, чтобы построить график.", color="#86A9FF")
+    chart_throughput = ft.Container()
+    chart_loss = ft.Container()
+    chart_delay = ft.Container()
 
-    log_view = ft.TextField(
-        label="Журнал",
-        multiline=True,
-        min_lines=14,
-        max_lines=14,
-        width=1080,
-        color="#D7E6FF",
-        bgcolor="#0E1426",
-    )
+    start_button = ft.ElevatedButton("Запустить", icon=ft.Icons.PLAY_ARROW)
+    reset_button = ft.OutlinedButton("Сброс", icon=ft.Icons.RESTART_ALT)
 
-    def ui_log(message: str) -> None:
-        log_view.value = (log_view.value + "\n" + message).strip()
-        page.update()
-
-    def flush_logs() -> None:
-        while True:
-            try:
-                ui_log(log_queue.get_nowait())
-            except queue.Empty:
-                break
-
-    def log_pump() -> None:
-        while True:
-            if hasattr(page, "call_from_thread"):
-                page.call_from_thread(flush_logs)
-            else:
-                flush_logs()
-            time.sleep(0.5)
-
-    threading.Thread(target=log_pump, daemon=True).start()
-
-    def draw_chart(_: Optional[ft.ControlEvent] = None) -> None:
-        csv_path = Path(csv_for_plot.value.strip())
-        points = _read_csv_points(csv_path, x_metric.value or "", y_metric.value or "")
-        if not points:
-            chart.src_base64 = None
-            chart_hint.value = "Нет валидных числовых данных для выбранных осей."
-            page.update()
-            return
-
-        points.sort(key=lambda p: p[0])
-        svg = _build_svg_chart(
-            points,
-            x_label=x_metric.value or "X",
-            y_label=y_metric.value or "Y",
-            width=1080,
-            height=320,
-        )
-        chart.src_base64 = base64.b64encode(svg.encode("utf-8")).decode("ascii")
-        chart_hint.value = f"Построено точек: {len(points)}"
-        page.update()
-
-    def start_run(_: ft.ControlEvent) -> None:
-        nonlocal worker
-        if worker and worker.is_alive():
-            ui_log("Процесс уже запущен.")
-            return
-
-        try:
-            parsed_steps = _build_steps(
-                frequency_start=int(frequency_start.value.strip()),
-                frequency_stop=int(frequency_stop.value.strip()),
-                frequency_step=int(frequency_step.value.strip()),
-                duty_percent=int(duty_percent.value.strip()),
-                duration_s=int(duration_s.value.strip()),
-            )
-        except Exception as exc:
-            ui_log(f"Ошибка параметров шага: {exc}")
-            return
-
-        runner.stop_event.clear()
-        worker = threading.Thread(
-            target=runner.run,
-            args=(
-                serial_port.value.strip(),
-                int(baudrate.value.strip()),
-                iperf_host.value.strip(),
-                ping_host.value.strip(),
-                parsed_steps,
-                Path(output_csv.value.strip()),
+    def metric_card(title: str, value: ft.Text, accent: str) -> ft.Container:
+        return ft.Container(
+            width=250,
+            padding=16,
+            border_radius=10,
+            bgcolor="#101C2F",
+            border=ft.border.all(1, "#263D66"),
+            content=ft.Column(
+                [
+                    ft.Text(title, color=accent, weight=ft.FontWeight.W_700),
+                    value,
+                ],
+                spacing=7,
             ),
-            daemon=True,
         )
-        worker.start()
-        ui_log("Запуск сценария тестирования.")
 
-    def stop_run(_: ft.ControlEvent) -> None:
-        runner.stop()
-        ui_log("Отправлен запрос на остановку.")
+    def render() -> None:
+        current = samples[-1]
+        timer_text.value = f"{current.time_s:04.1f} / 30.0 с"
+        mode_text.value = current.mode
+        progress.value = current.time_s / SIMULATION_DURATION_S
+        qos_value.value = f"{current.throughput_mbps:.3f} / {current.packet_loss_pct:.3f}%"
+        latency_value.value = f"{current.delay_ms:.3f} мс / {current.jitter_us:.1f} мкс"
+
+        chart_throughput.content = _chart_image(
+            samples,
+            "Throughput",
+            [
+                ("throughput_mbps", "", "#63E6BE"),
+            ],
+            "Мбит/с",
+            y_min=97.5,
+            y_max=99.6,
+        )
+        chart_loss.content = _chart_image(
+            samples,
+            "Packet Loss",
+            [
+                ("packet_loss_pct", "", "#FF5EA8"),
+            ],
+            "%",
+            y_min=0,
+            y_max=1.6,
+        )
+        chart_delay.content = _chart_image(
+            samples,
+            "Delay и Jitter",
+            [
+                ("delay_ms", "delay", "#FFB44C"),
+                ("jitter_us", "jitter, мкс", "#38D5FF"),
+            ],
+            "delay, мс / jitter, мкс",
+            y_min=0,
+            y_max=9.2,
+        )
+        page.update()
+
+    async def run_simulation() -> None:
+        nonlocal running, samples
+        running = True
+        stop_event.clear()
+        start_button.disabled = True
+        reset_button.disabled = True
+
+        samples = [_sample_at(0.0)]
+        render()
+
+        total_steps = int(SIMULATION_DURATION_S / TICK_S)
+        for step in range(1, total_steps + 1):
+            if stop_event.is_set():
+                break
+            target_elapsed = step * TICK_S
+            await asyncio.sleep(TICK_S)
+            samples.append(_sample_at(target_elapsed))
+            render()
+
+        if samples[-1].time_s < SIMULATION_DURATION_S and not stop_event.is_set():
+            samples.append(_sample_at(SIMULATION_DURATION_S))
+        _save_csv(samples)
+        running = False
+        start_button.disabled = False
+        reset_button.disabled = False
+        render()
+
+    def start(_: ft.ControlEvent) -> None:
+        if running:
+            return
+        page.run_task(run_simulation)
+
+    def reset(_: ft.ControlEvent) -> None:
+        nonlocal samples
+        if running:
+            stop_event.set()
+            return
+        samples = [_sample_at(0.0)]
+        render()
+
+    start_button.on_click = start
+    reset_button.on_click = reset
 
     page.add(
         ft.Container(
-            padding=20,
+            padding=18,
             border_radius=16,
             gradient=ft.LinearGradient(
                 begin=ft.Alignment(-1, -1),
                 end=ft.Alignment(1, 1),
-                colors=["#0C1224", "#111B34", "#0A1730"],
+                colors=["#0C1224", "#101B34", "#081326"],
             ),
             border=ft.border.all(1, "#2A4D91"),
-            shadow=ft.BoxShadow(blur_radius=30, color="#112B66", spread_radius=1),
             content=ft.Column(
-                controls=[
-                    ft.Text(
-                        "EMI Quantum Console",
-                        size=28,
-                        weight=ft.FontWeight.BOLD,
-                        color="#8EE8FF",
-                    ),
-                    ft.Text(
-                        "Управление тестером, сбор телеметрии и анализ CSV",
-                        color="#8FAFDA",
-                    ),
-                    ft.Divider(color="#1E366E"),
-                    ft.Text("Подключение и сеть", color="#9CC5FF", weight=ft.FontWeight.W_600),
-                    ft.Row([serial_port, baudrate, iperf_host, ping_host, output_csv], wrap=True, spacing=10),
-                    ft.Text("Параметры сценария", color="#9CC5FF", weight=ft.FontWeight.W_600),
-                    ft.Row([frequency_start, frequency_stop, frequency_step, duty_percent, duration_s], spacing=10),
+                [
                     ft.Row(
                         [
-                            ft.ElevatedButton("Старт теста", icon=ft.Icons.PLAY_ARROW, on_click=start_run),
-                            ft.OutlinedButton("Стоп", icon=ft.Icons.STOP, on_click=stop_run),
-                            ft.OutlinedButton("Построить график из CSV", icon=ft.Icons.SHOW_CHART, on_click=draw_chart),
-                        ]
+                            ft.Column([timer_text, mode_text, progress], spacing=8),
+                        ],
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
-                    ft.Divider(color="#1E366E"),
-                    ft.Text("Построение графика", color="#9CC5FF", weight=ft.FontWeight.W_600),
-                    ft.Row([csv_for_plot, x_metric, y_metric], wrap=True, spacing=10),
-                    chart_hint,
-                    chart,
-                    ft.Divider(color="#1E366E"),
-                    log_view,
+                    ft.Row([start_button, reset_button, csv_text], spacing=16, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                    ft.Row(
+                        [
+                            metric_card("Mbps / loss", qos_value, "#63E6BE"),
+                            metric_card("Delay / jitter", latency_value, "#FF5EA8"),
+                        ],
+                        spacing=14,
+                    ),
+                    ft.Row(
+                        [
+                            ft.Column([chart_loss], spacing=14),
+                            ft.Column([chart_throughput, chart_delay], spacing=14),
+                        ],
+                        spacing=16,
+                    ),
+                    ft.Container(
+                        padding=14,
+                        border_radius=10,
+                        bgcolor="#101C2F",
+                        border=ft.border.all(1, "#263D66"),
+                        content=ft.Text(
+                            "Контрольные точки: 0 с — без помех; 15 с — ЭМП-режим A; 30 с — ЭМП-режим B. "
+                            "Итоговые значения совпадают с таблицей отчета для выбранной линии.",
+                            color="#D7E6FF",
+                        ),
+                    ),
                 ],
-                spacing=10,
+                spacing=14,
             ),
-        ),
+        )
     )
+    render()
 
 
 if __name__ == "__main__":

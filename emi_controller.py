@@ -1,6 +1,6 @@
 """
 emi_controller.py — главный управляющий скрипт EMI Stress-Tester
-Управляет генератором помех (ESP32), запускает сетевые тесты,
+Управляет генератором помех (Arduino Leonardo), запускает сетевые тесты,
 логирует данные с EMI-датчика, синхронизирует по timestamp.
 """
 
@@ -16,7 +16,7 @@ from pathlib import Path
 # ──────────────────────────────────────────────
 # Конфигурация
 # ──────────────────────────────────────────────
-SERIAL_PORT   = "/dev/ttyUSB0"   # порт ESP32
+SERIAL_PORT   = "/dev/ttyUSB0"   # порт Arduino Leonardo
 BAUD_RATE     = 115200
 IPERF_SERVER  = "192.168.1.100"  # IP iperf3-сервера
 IPERF_PORT    = 5201
@@ -48,13 +48,13 @@ IPERF_DURATION = 10  # сек
 
 
 # ──────────────────────────────────────────────
-# Класс: соединение с ESP32
+# Класс: соединение с Arduino Leonardo
 # ──────────────────────────────────────────────
-class ESP32Controller:
+class Arduino LeonardoController:
     def __init__(self, port: str, baud: int):
         self.ser = serial.Serial(port, baud, timeout=2)
-        time.sleep(2)          # ждём готовности ESP32
-        print(f"[ESP32] Подключено: {port}")
+        time.sleep(2)          # ждём готовности Arduino Leonardo
+        print(f"[Arduino Leonardo] Подключено: {port}")
 
     def send_command(self, freq: int, duty: int) -> str:
         """Отправляет команду вида 'SET:freq=1000,duty=50' и читает ответ."""
@@ -73,7 +73,7 @@ class ESP32Controller:
 # ──────────────────────────────────────────────
 class EMISensor:
     """
-    Читает данные с EMI-датчика (ADC через ESP32 второй UART или I2C).
+    Читает данные с EMI-датчика (ADC через Arduino Leonardo второй UART или I2C).
     Формат строки от датчика: 'EMI:<значение_мВ>\n'
     """
     def __init__(self, port: str, baud: int):
@@ -175,9 +175,9 @@ def main():
     print("  EMI Stress-Tester — старт сессии", SESSION_ID)
     print("=" * 60)
 
-    esp  = ESP32Controller(SERIAL_PORT, BAUD_RATE)
+    esp  = Arduino LeonardoController(SERIAL_PORT, BAUD_RATE)
 
-    # Датчик — второй UART (или тот же порт, если ESP32 мультиплексирует)
+    # Датчик — второй UART (или тот же порт, если Arduino Leonardo мультиплексирует)
     # Для автономного запуска без датчика — заменить на EMISensorMock()
     emi_port = "/dev/ttyUSB1"
     emi  = EMISensor(emi_port, BAUD_RATE)
@@ -197,7 +197,7 @@ def main():
 
             # 1. Установить параметры генератора
             resp = esp.send_command(freq, duty)
-            print(f"  ESP32 → {resp}")
+            print(f"  Arduino Leonardo → {resp}")
 
             # 2. Дать сигналу стабилизироваться
             time.sleep(STABILIZE_TIME)

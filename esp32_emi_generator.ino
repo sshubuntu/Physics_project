@@ -1,6 +1,6 @@
 /*
-  esp32_emi_generator.ino
-  Прошивка ESP32 для генератора ЭМ-помех (MOSFET + индуктивная катушка).
+  Arduino Leonardo_emi_generator.ino
+  Прошивка Arduino Leonardo для генератора ЭМ-помех (MOSFET + индуктивная катушка).
   Принимает команды по UART, управляет PWM и читает ADC с EMI-датчика.
 
   Команды (Serial @ 115200):

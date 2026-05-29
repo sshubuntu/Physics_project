@@ -1,0 +1,87 @@
+<svg width="100%" viewBox="0 0 680 650" role="img" xmlns="http://www.w3.org/2000/svg">
+  <title>Схема подключения EMI-генератора на Arduino Leonardo</title>
+  <desc>Схема соединений Arduino Leonardo, IRLZ44N, реле, защитного диода, питания, катушки и тестируемого кабеля.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      .bg { fill: #07111f; }
+      .grid { stroke: rgba(255,255,255,.07); stroke-width: 1; }
+      .box { rx: 12; stroke-width: 1.5; }
+      .blue { fill: #0c447c; stroke: #38d5ff; }
+      .amber { fill: #633806; stroke: #ffb44c; }
+      .mint { fill: #085041; stroke: #63e6be; }
+      .pink { fill: #72243e; stroke: #ff5ea8; }
+      .violet { fill: #3c3489; stroke: #b4abff; }
+      .panel { fill: rgba(16,28,47,.92); stroke: rgba(255,255,255,.16); }
+      .title { fill: #f6faff; font: 700 20px "Segoe UI", Arial, sans-serif; }
+      .label { fill: #f6faff; font: 700 15px "Segoe UI", Arial, sans-serif; }
+      .small { fill: #b8c7d9; font: 500 12px "Segoe UI", Arial, sans-serif; }
+      .wire-blue { stroke: #38d5ff; }
+      .wire-amber { stroke: #ffb44c; }
+      .wire-mint { stroke: #63e6be; }
+      .wire-pink { stroke: #ff5ea8; }
+      .wire-violet { stroke: #b4abff; }
+      .wire { fill: none; stroke-width: 3; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect class="bg" width="680" height="650"/>
+  <g opacity=".35">
+    <path class="grid" d="M40 0V650M120 0V650M200 0V650M280 0V650M360 0V650M440 0V650M520 0V650M600 0V650"/>
+    <path class="grid" d="M0 80H680M0 160H680M0 240H680M0 320H680M0 400H680M0 480H680M0 560H680M0 640H680"/>
+  </g>
+
+  <text x="340" y="42" text-anchor="middle" class="title">Схема сборки стенда</text>
+  <text x="340" y="66" text-anchor="middle" class="small">PWM управляет силовым ключом, катушка создает поле, кабель проходит в зоне воздействия</text>
+
+  <rect x="230" y="96" width="220" height="130" class="box blue"/>
+  <text x="340" y="128" text-anchor="middle" class="label">Arduino Leonardo</text>
+  <text x="256" y="160" class="small">D9 PWM</text>
+  <text x="256" y="184" class="small">A0 ADC</text>
+  <text x="392" y="160" text-anchor="end" class="small">5V</text>
+  <text x="392" y="184" text-anchor="end" class="small">GND</text>
+
+  <rect x="70" y="286" width="150" height="64" class="box amber"/>
+  <text x="145" y="313" text-anchor="middle" class="label">R1 100 Ом</text>
+  <text x="145" y="334" text-anchor="middle" class="small">ограничение gate</text>
+
+  <rect x="70" y="420" width="150" height="76" class="box pink"/>
+  <text x="145" y="449" text-anchor="middle" class="label">IRLZ44N</text>
+  <text x="145" y="471" text-anchor="middle" class="small">MOSFET-ключ</text>
+
+  <rect x="265" y="286" width="150" height="76" class="box mint"/>
+  <text x="340" y="314" text-anchor="middle" class="label">Реле 12В</text>
+  <text x="340" y="336" text-anchor="middle" class="small">коммутация питания</text>
+
+  <rect x="265" y="420" width="150" height="64" class="box pink"/>
+  <text x="340" y="447" text-anchor="middle" class="label">1N4007</text>
+  <text x="340" y="468" text-anchor="middle" class="small">защита от выброса</text>
+
+  <rect x="465" y="286" width="150" height="76" class="box mint"/>
+  <text x="540" y="314" text-anchor="middle" class="label">Питание 12В</text>
+  <text x="540" y="336" text-anchor="middle" class="small">18650 или 8xAA</text>
+
+  <rect x="465" y="420" width="150" height="76" class="box violet"/>
+  <text x="540" y="449" text-anchor="middle" class="label">Катушка</text>
+  <text x="540" y="471" text-anchor="middle" class="small">МГТФ 0.35 на М8</text>
+
+  <rect x="70" y="570" width="545" height="64" class="box panel"/>
+  <text x="342" y="596" text-anchor="middle" class="label">Патч-корд UTP/STP Cat5e, 2 м</text>
+  <text x="342" y="619" text-anchor="middle" class="small">располагается рядом с катушкой и тестируется через iperf3 / ping</text>
+
+  <path class="wire wire-blue" d="M230 158H174V286"/>
+  <path class="wire wire-amber" d="M145 350V420"/>
+  <path class="wire wire-pink" d="M220 458H265"/>
+  <path class="wire wire-mint" d="M415 324H465"/>
+  <path class="wire wire-mint" d="M540 362V420"/>
+  <path class="wire wire-violet" d="M540 496V570"/>
+  <path class="wire wire-blue" d="M230 184H112V570"/>
+  <path class="wire wire-amber" d="M450 160H540V286"/>
+  <path class="wire wire-pink" d="M340 420V362"/>
+
+  <text x="172" y="258" text-anchor="middle" class="small">PWM</text>
+  <text x="104" y="532" class="small">A0 / измерение</text>
+  <text x="560" y="548" class="small">ЭМП</text>
+</svg>

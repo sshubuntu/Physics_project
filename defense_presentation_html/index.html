@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Защита проекта: электромагнитные помехи</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="deck" aria-label="HTML-презентация для защиты проекта">
+    <section class="slide title-slide" data-logical="1" data-part="Введение">
+      <div class="accent-strip"></div>
+      <div class="title-layout">
+        <div>
+          <p class="eyebrow">Научно-Исследовательский университет ИТМО | P3209</p>
+          <h1>Исследование влияния электромагнитных помех на сетевое оборудование</h1>
+        </div>
+        <div class="title-side">
+          <div class="emi-mark" aria-hidden="true">
+            <div class="ring ring-a"></div>
+            <div class="ring ring-b"></div>
+            <div class="ring ring-c"></div>
+            <strong>EMI</strong>
+          </div>
+          <div class="authors">
+            <b>Шубин Егор</b><br>
+            <b>Мухамедьяров Артур</b>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" data-logical="3" data-part="Введение">
+      <header>
+        <h2>Проблема</h2>
+      </header>
+      <div class="two-col">
+        <div class="stack">
+          <div class="card">
+            <h3>Зачем это исследовать</h3>
+            <p>Сетевые линии часто идут рядом с блоками питания, силовыми кабелями, двигателями, зарядками и плотными кабельными жгутами. Это создает условия для возникновения электромагнитных помех, влияющих на работу сетевого оборудования. Особо актуально в нынешнеее время при использовании глушилок.</p>
+          </div>
+          <div class="card accent-amber">
+            <h3>Что происходит?</h3>
+            <p>Падает пропускная способность, растут потери пакетов, появляются нестабильность соединения и задержки.</p>
+          </div>
+        </div>
+        <figure class="problem-figure">
+          <img src="image.png" alt="Схема влияния внешних электромагнитных помех на линию передачи">
+        </figure>
+      </div>
+    </section>
+
+    <section class="slide" data-logical="4" data-part="Введение">
+      <header>
+        <h2>Цель</h2>
+      </header>
+      <div class="goal-box">
+Разработать прототип автоматической системы, которая генерирует управляемые электромагнитные помехи и одновременно измеряет их реальный уровень с помощью датчика электромагнитного поля, проводя сетевые тесты в режиме реального времени и выявляет количественную зависимость между уровнем электромагнитного воздействия и параметрами работы сетевого оборудования.     
+      </div>
+      <div class="tasks-grid">
+        <article class="card accent-cyan">
+          <h3>Собрать стенд</h3>
+          <p>Генератор ЭМП, датчик поля и тестируемая сеть.</p>
+        </article>
+        <article class="card accent-amber">
+          <h3>Автоматизировать тесты</h3>
+          <p>Синхронно менять режим помехи и запускать измерения.</p>
+        </article>
+        <article class="card accent-mint">
+          <h3>Сравнить кабели</h3>
+          <p>Оценить деградацию UTP и STP по сетевым метрикам.</p>
+        </article>
+      </div>
+    </section>
+
+    
+    <section class="slide" data-logical="8" data-part="Физика">
+      <header>
+        <p class="eyebrow">Шаг 1</p>
+        <h2>От мощности источника к току</h2>
+      </header>
+      <div class="two-col">
+        <div class="formula-panel">
+          <p>Считаем силу тока у генератора помех:</p>
+          <div class="formula">I = P / U = 2000 / 220 ≈ 9,09 А</div>
+          <div class="formula-notes">
+            <p><b>P</b> - мощность источника помехи: берем 2000 Вт исходя из кол-ва батареек.</p>
+            <p><b>U</b> - напряжение питания- 220 В.</p>
+            <p><b>I</b> - ток, который создает магнитное поле вокруг проводника или катушки.</p>
+            <p><b>B(r)</b> - магнитная индукция на расстоянии <b>r</b>; дальше считаем ее по закону Био-Савара.</p>
+          </div>
+        </div>
+        <div class="visual-wire" aria-hidden="true">
+          <div class="wire"></div>
+          <div class="field field-1"></div>
+          <div class="field field-2"></div>
+          <div class="field field-3"></div>
+          <span class="label-current">кабель</span>
+        </div>
+      </div>
+      <div class="chain">
+        <b>P, U<br><small>исходные данные</small></b><i></i><b>I = P/U<br><small>ток источника</small></b><i></i><b>B(r)<br><small>поле у кабеля</small></b>
+      </div>
+    </section>
+
+    <section class="slide" data-logical="9" data-part="Физика">
+      <header>
+        <p class="eyebrow">Шаг 2</p>
+        <h2>Закон Био-Савара</h2>
+      </header>
+      <div class="two-col">
+        <div class="stack">
+          <div class="formula-panel compact">
+            <div class="formula">B(r) = μ<sub>0</sub>I / 2πr</div>
+            <p>μ<sub>0</sub> = 4π · 10<sup>-7</sup> Гн/м. В воздухе μ<sub>r</sub> ≈ 1, значит B ≈ μ<sub>0</sub>H.</p>
+            <div class="formula-notes">
+              <p><b>B(r)</b> - магнитная индукция в точке на расстоянии <b>r</b> от источника.</p>
+              <p><b>μ<sub>0</sub></b> - магнитная постоянная, задает связь между током и полем в воздухе.</p>
+              <p><b>r</b> - расстояние от проводника до кабеля: чем оно больше, тем меньше поле.</p>
+            </div>
+          </div>
+          <div class="card accent-cyan">
+            <h3>Смысл</h3>
+            <p>Поле обратно пропорционально расстоянию. Поэтому разница между 8 см и 14 см в эксперименте существенна.</p>
+          </div>
+        </div>
+        <figure class="plot">
+          <img src="../img_dark/01_B_vs_distance.png" alt="Зависимость магнитной индукции от расстояния">
+        </figure>
+      </div>
+    </section>
+
+    <section class="slide" data-logical="10" data-part="Физика">
+      <header>
+        <p class="eyebrow">Шаг 3</p>
+        <h2>Полученные результаты</h2>
+      </header>
+      <table class="data-table wide result-table">
+        <thead>
+          <tr><th>R</th><th>B</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>5 см</td><td>36,4 мкТл</td></tr>
+          <tr><td>8 см</td><td>22,8 мкТл</td></tr>
+          <tr><td>10 см</td><td>18,2 мкТл</td></tr>
+          <tr><td>14 см</td><td>13 мкТл</td></tr>
+          <tr><td>20 см</td><td>9 мкТл</td></tr>
+        </tbody>
+      </table>
+      <div class="bottom-callout amber">При одном расстоянии поле B одинаковое для STP и UTP; отличие проявляется в том, как кабель переносит это воздействие.</div>
+    </section>
+
+    <section class="slide" data-logical="11" data-part="Физика">
+      <header>
+        <p class="eyebrow">Шаг 4</p>
+        <h2>Магнитный поток через витую пару</h2>
+      </header>
+      <div class="two-col">
+        <div class="formula-panel">
+          <p>Контур образуют два проводника пары:</p>
+          <div class="formula">A = d · L = 0,5 мм · 2 м = 10<sup>-3</sup> м²</div>
+          <div class="formula">Φ = B · A = 2 · 10<sup>-3</sup> · 10<sup>-3</sup> = 2 · 10<sup>-6</sup> Вб</div>
+          <div class="formula-notes">
+            <p><b>A</b> - площадь контура, через который проходит магнитное поле.</p>
+            <p><b>d</b> - расстояние между проводниками пары, <b>L</b> - длина участка кабеля.</p>
+            <p><b>Φ</b> - магнитный поток: чем больше <b>B</b> и <b>A</b>, тем сильнее возможная наводка.</p>
+          </div>
+        </div>
+        <div class="pair-diagram" aria-hidden="true">
+          <div class="twist t1"></div>
+          <div class="twist t2"></div>
+          <span>d ≈ 0,5 мм</span>
+          <span>L = 2 м</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" data-logical="12" data-part="Физика">
+      <header>
+        <p class="eyebrow">Шаг 5</p>
+        <h2>Закон Фарадея: поток дает ЭДС</h2>
+      </header>
+      <div class="two-col split-55">
+        <div class="formula-panel">
+          <p>Если поток меняется синусоидально:</p>
+          <div class="formula">Φ(t) = Φ<sub>0</sub> sin(ωt), &nbsp; ω = 2πf</div>
+          <div class="formula">ℰ<sub>амп</sub> = 2πfAB</div>
+          <div class="formula formula-tight">ℰ ≈ 2π · 50 · 10<sup>-3</sup> · 2 · 10<sup>-3</sup> ≈ 0,63 мВ</div>
+          <div class="formula-notes">
+            <p><b>Φ(t)</b> - магнитный поток через контур витой пары в момент времени <b>t</b>.</p>
+            <p><b>Φ<sub>0</sub></b> - амплитуда потока, <b>ω</b> - угловая частота изменения поля.</p>
+            <p><b>f</b> - частота помехи; чем она выше, тем больше наведенная ЭДС.</p>
+            <p><b>ℰ</b> - наведенное паразитное напряжение в линии.</p>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="card accent-pink">
+            <h3>Что это значит</h3>
+            <p>В линии появляется паразитное напряжение. Оно мало само по себе, но становится опаснее при резких фронтах и высокочастотных гармониках.</p>
+          </div>
+          <div class="card">
+            <h3>Почему оценка идеальная</h3>
+            <p>Витая пара частично компенсирует наводку, но неоднородное поле и неидеальная скрутка оставляют остаточный шум.</p>
+          </div>
+        </div>
+      </div>
+      <div class="bottom-callout pink">ЭДС появляется не от самого поля, а от изменения магнитного потока во времени.</div>
+    </section>
+
+    <section class="slide" data-logical="13" data-part="Физика">
+      <header>
+        <p class="eyebrow">Шаг 6</p>
+        <h2>Сравниваем помеху с Ethernet-сигналом</h2>
+      </header>
+      <div class="two-col">
+        <div class="formula-panel">
+          <p>Дифференциальная амплитуда полезного сигнала порядка 1 В:</p>
+          <div class="formula">SNR = 20 lg(U<sub>сигн</sub> / ℰ)</div>
+          <div class="formula formula-tight">SNR = 20 lg(1 / 6,28·10<sup>-4</sup>) ≈ 64 дБ</div>
+          <div class="formula-notes">
+            <p><b>SNR</b> - отношение полезного Ethernet-сигнала к наведенной помехе.</p>
+            <p><b>U<sub>сигн</sub></b> - амплитуда полезного дифференциального сигнала, берем около 1 В.</p>
+          </div>
+        </div>
+        <div class="card signal-card">
+          <h3>Почему сеть все равно деградирует</h3>
+          <p>Ethernet-трансформаторы хорошо подавляют низкую частоту 50 Гц, но MOSFET с катушкой создает короткие импульсы. Их высокочастотные гармоники хуже подавляются и попадают в рабочую полосу приемника.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" data-logical="15" data-part="Физика">
+      <header>
+        <p class="eyebrow">Защита линии</p>
+        <h2>Скрутка и экран уменьшают наведенную ЭДС</h2>
+      </header>
+      <div class="two-col split-55">
+        <div class="stack">
+          <div class="card">
+            <h3>UTP</h3>
+            <p>В соседних полувитках наводки имеют противоположные знаки и частично компенсируются. Чем равномернее скрутка, тем лучше подавление.</p>
+          </div>
+          <div class="card accent-mint">
+            <h3>STP</h3>
+            <p>Фольга и экран создают дополнительный путь для наведенных токов и уменьшают поле внутри кабеля, особенно в высокочастотной области.</p>
+          </div>
+          <div class="compare-bars compact-bars">
+            <div><span>UTP 100 МГц</span><b style="width:72%">44-54 дБ</b></div>
+            <div><span>STP 100 МГц</span><b style="width:82%">46-58 дБ</b></div>
+            <div><span>Эффект экрана</span><b style="width:90%">20-40 дБ в ВЧ-диапазоне</b></div>
+          </div>
+        </div>
+        <figure class="cable-photo">
+          <img src="images/utpandstp.png" alt="Сравнение кабелей UTP и STP">
+        </figure>
+      </div>
+      <div class="bottom-callout mint">Поэтому одинаковая внешняя помеха не обязана давать одинаковый сетевой эффект для UTP и STP.</div>
+    </section>
+
+    <section class="slide" data-logical="18" data-part="Практика">
+      <header>
+        <p class="eyebrow">Практическая часть · сборка</p>
+        <h2>Схема подключения EMI-генератора</h2>
+      </header>
+      <div class="two-col split-62">
+        <figure class="diagram-panel">
+          <img src="emi_wiring_diagram.svg" alt="Схема соединений EMI-генератора на Arduino Leonardo">
+        </figure>
+        <div class="stack">
+          <div class="card accent-cyan">
+            <h3>Управление</h3>
+            <p>Arduino Leonardo формирует PWM-сигнал, который задает режим работы силового ключа.</p>
+          </div>
+          <div class="card accent-amber">
+            <h3>Силовая часть</h3>
+            <p>IRLZ44N коммутирует ток через катушку, а диод защищает схему от выбросов самоиндукции.</p>
+          </div>
+          <div class="card accent-mint">
+            <h3>Измерение</h3>
+            <p>Кабель UTP/STP проходит рядом с катушкой, после чего оценивается сетевой отклик.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" data-logical="19" data-part="Практика">
+      <header>
+        <p class="eyebrow">Материалы</p>
+        <h2>Что понадобилось для сборки</h2>
+      </header>
+      <div class="two-col split-55">
+        <ul class="parts-list">
+          <li>МГТФ 0.35 — 10 м</li>
+          <li>IRLZ44N — 2 шт</li>
+          <li>1N4007 — 5 шт</li>
+          <li>Резистор 100 Ом MF-25 — 5 шт</li>
+          <li>Резистор 10 кОм MF-25 — 5 шт</li>
+          <li>Реле 12В NCR NRP-07-C-12D или Hongfa HF3FA — 1 шт</li>
+          <li>Держатели для батареек 18650 — 2 шт или на 8×AA</li>
+          <li>Макетная плата 400 точек — 1 шт</li>
+          <li>Болт М8×50 — 1 шт</li>
+          <li>Патч-корд UTP Cat5e 2 м — 1 шт</li>
+          <li>Патч-корд STP Cat5e 2 м — 1 шт</li>
+        </ul>
+        <figure class="photo-panel">
+          <img src="images/photo_1_2026-05-29_08-54-51.jpg" alt="Материалы для сборки EMI-генератора">
+        </figure>
+      </div>
+      <div class="bottom-callout amber">Компоненты подобраны так, чтобы собрать управляемый источник поля и сразу сравнить две линии: UTP и STP.</div>
+    </section>
+
+    <section class="slide" data-logical="21" data-part="Практика">
+      <header>
+        <p class="eyebrow">Этап 1</p>
+        <h2>Подготовка платы и силовой части</h2>
+      </header>
+      <div class="photo-grid two-photos captioned-photos">
+        <figure>
+          <img src="images/photo_4_2026-05-29_08-54-51.jpg" alt="Компоненты для платы и силовой части">
+          <figcaption><h3>Разметка</h3><p>Разложили плату, ключ, диоды, резисторы и питание перед пайкой.</p></figcaption>
+        </figure>
+        <figure>
+          <img src="images/photo_5_2026-05-29_08-54-51.jpg" alt="Подключение проводов к Arduino Leonardo">
+          <figcaption><h3>Соединения</h3><p>Подпаяли линии для подключения к контроллеру.</p></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="slide" data-logical="22" data-part="Практика">
+      <header>
+        <p class="eyebrow">Этап 2</p>
+        <h2>Намотка катушки источника ЭМП</h2>
+      </header>
+      <div class="two-col split-55">
+        <figure class="photo-panel tall-photo">
+          <img src="images/photo_8_2026-05-29_08-54-51.jpg" alt="Намотка катушки проводом МГТФ">
+        </figure>
+        <div class="stack">
+          <div class="card">
+            <h3>Обмотка</h3>
+            <p>Провод МГТФ 0.35 намотан на отвертку, мы произвели 108 витков, чтобы собрать катушку. Таким образом мы получили воспроизводимый источник поля. После намотки, аккуратно сняли катушку с отверткию.</p>
+          </div>
+          <div class="card accent-amber">
+            <h3>Сборка</h3>
+            <p>Катушку залили жидким клеем, используя клеевой пистолет. Таким образом у нас получилась надежная конструкция.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" data-logical="23" data-part="Практика">
+      <header>
+        <p class="eyebrow">Этап 3</p>
+        <h2>Финальная сборка на плате</h2>
+      </header>
+      <div class="photo-grid two-photos captioned-photos">
+        <figure>
+          <img src="images/photo_7_2026-05-29_08-54-51.jpg" alt="Плата с реле, MOSFET и защитным диодом">
+          <figcaption><h3>Сборка схемы</h3><p>К плате припаяны ключ, реле, защитный диод и силовые соединения.</p></figcaption>
+        </figure>
+        <figure>
+          <img src="images/photo_9_2026-05-29_08-54-51.jpg" alt="Собранный стенд с катушкой и патч-кордом">
+          <figcaption><h3>Положение кабеля</h3><p>Припаяли катушку. Теперь патч-корд будет проходить максимально рядом с катушкой.</p></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="slide" data-logical="24" data-part="Практика">
+      <header>
+        <p class="eyebrow">Этап 4</p>
+        <h2>Проверка стенда в сетевом тесте</h2>
+      </header>
+      <div class="two-col split-62">
+        <figure class="photo-panel">
+          <img src="images/photo_6_2026-05-29_08-54-51.jpg" alt="Проверка стенда между двумя ноутбуками">
+        </figure>
+        <div class="stack">
+          <div class="card accent-cyan">
+            <h3>Сетевой канал</h3>
+            <p>Два ноутбука соединены патч-кордом, который проходит через область действия катушки.</p>
+          </div>
+          <div class="card accent-amber">
+            <h3>Нагрузка</h3>
+            <p>Для первоначального тестирования использовались iperf3 и ping: скорость, потери пакетов и задержка. Затем обернули в приложение.</p>
+          </div>
+          <div class="card accent-mint">
+            <h3>Сравнение</h3>
+            <p>Одинаковая процедура повторялась для UTP и STP, чтобы сравнить устойчивость кабелей.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide code-slide" data-logical="25" data-part="Практика">
+      <header>
+        <p class="eyebrow">C++ · датчик</p>
+        <h2>Чтение уровня ЭМП через ADC</h2>
+      </header>
+      <div class="two-col split-58">
+        <pre><code>const int PIN_EMI_SENSOR = 34;
+
+const int   ADC_SAMPLES = 32;
+const float ADC_REF_MV  = 3300.0f;
+const float ADC_MAX     = 4095.0f;
+
+float readEMI_mV() {
+    long sum = 0;
+
+    for (int i = 0; i &lt; ADC_SAMPLES; i++) {
+        sum += analogRead(PIN_EMI_SENSOR);
+        delayMicroseconds(200);
+    }
+
+    float avg = (float)sum / ADC_SAMPLES;
+    return (avg / ADC_MAX) * ADC_REF_MV;
+}</code></pre>
+        <div class="stack">
+          <div class="card accent-cyan">
+            <h3>Что измеряем</h3>
+            <p>ADC считывает напряжение с датчика поля, подключенного к аналоговому входу.</p>
+          </div>
+          <div class="card accent-amber">
+            <h3>Зачем 32 выборки</h3>
+            <p>Усреднение сглаживает шум и делает показание устойчивым для сравнения режимов.</p>
+          </div>
+          <div class="card accent-mint">
+            <h3>Почему мВ</h3>
+            <p>Сырое значение ADC переводится в милливольты, чтобы записывать физически понятную величину.</p>
+          </div>
+        </div>
+      </div>
+      <div class="bottom-callout cyan">Каждый сетевой тест связывается не только с заданной частотой PWM, но и с реальным показанием датчика.</div>
+    </section>
+
+    <section class="slide code-slide" data-logical="26" data-part="Практика">
+      <header>
+        <p class="eyebrow">C++ · измерительный цикл</p>
+        <h2>Передача показаний датчика в эксперимент</h2>
+      </header>
+      <div class="two-col split-58">
+        <pre><code>void setup() {
+    Serial.begin(115200);
+    analogReadResolution(12);
+    analogSetAttenuation(ADC_11db);
+
+    setupPWM(50, 0);
+    Serial.println("READY");
+}
+
+void loop() {
+    if (Serial.available()) {
+        String cmd = Serial.readStringUntil('\n');
+        parseCommand(cmd);
+    }
+
+    if (millis() - lastEMISend &gt;= 500) {
+        lastEMISend = millis();
+        float emi = readEMI_mV();
+        Serial.print("EMI:");
+        Serial.println(emi, 2);
+    }
+}</code></pre>
+        <div class="stack">
+          <div class="card">
+            <h3>Настройка ADC</h3>
+            <p>12-битное разрешение и диапазон до 3,3 В дают шкалу 0-4095 для пересчета в мВ.</p>
+          </div>
+          <div class="card accent-mint">
+            <h3>Связь с ПК</h3>
+            <p>Контроллер принимает команды по Serial и каждые 500 мс отправляет строку вида <b>EMI:123.45</b>.</p>
+          </div>
+          <div class="card accent-amber">
+            <h3>Синхронизация</h3>
+            <p>Python-скрипт получает это значение и передает приложению.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" data-logical="27" data-part="Практика">
+      <header>
+        <p class="eyebrow">Результаты</p>
+        <h2>UTP против STP</h2>
+      </header>
+      <div class="two-col split-58">
+        <figure class="plot">
+          <img src="../img_dark/02_QoS_UTP_vs_STP.png" alt="Сравнение QoS для UTP и STP">
+        </figure>
+        <div class="stack">
+          <table class="data-table compact-table">
+            <thead><tr><th>Показатель</th><th>UTP</th><th>STP</th></tr></thead>
+            <tbody>
+              <tr><td>Throughput без помех</td><td>98,892</td><td>99,152</td></tr>
+              <tr><td>Throughput режим B</td><td>95,670</td><td>98,192</td></tr>
+              <tr><td>Потери без помех</td><td>0,496%</td><td>0,240%</td></tr>
+              <tr><td>Потери режим B</td><td>3,488%</td><td>1,148%</td></tr>
+            </tbody>
+          </table>
+          <div class="card accent-mint">
+            <p>При сильном воздействии STP теряет меньше скорости и дает примерно в 3 раза меньшие потери пакетов.</p>
+          </div>
+        </div>
+      </div>
+      <div class="bottom-callout mint">При одинаковой помехе экранированная линия деградирует заметно слабее.</div>
+    </section>
+
+    <section class="slide" data-logical="28" data-part="Практика">
+      <header>
+        <p class="eyebrow">Количественный вывод</p>
+        <h2>Деградация throughput</h2>
+      </header>
+      <div class="two-col">
+        <div class="formula-panel">
+          <h3>UTP</h3>
+          <div class="formula formula-tight">ΔT<sub>UTP</sub> = 3,222 / 98,892 · 100% ≈ 3,25%</div>
+          <p>Packet Loss: 0,50% → 3,49%, рост примерно в 7 раз.</p>
+        </div>
+        <div class="formula-panel mint-panel">
+          <h3>STP</h3>
+          <div class="formula formula-tight">ΔT<sub>STP</sub> = 0,960 / 99,152 · 100% ≈ 0,97%</div>
+          <p>Packet Loss: 0,24% → 1,15%, ниже порога 5%.</p>
+        </div>
+      </div>
+      <div class="chain">
+        <b>UTP -3,25%</b><i></i><b>STP -0,97%</b><i></i><b>выигрыш &gt;3 раз</b>
+      </div>
+    </section>
+
+    <section class="slide" data-logical="29" data-part="Практика">
+      <header>
+        <p class="eyebrow">Визуализация</p>
+        <h2>3D-корреляции</h2>
+      </header>
+      <div class="two-col">
+        <figure class="plot">
+          <img src="../img_dark/04_3D_EMI_loss.png" alt="3D-график потерь пакетов от ЭМП и частоты">
+        </figure>
+        <figure class="plot">
+          <img src="../img_dark/05_3D_EMI_throughput.png" alt="3D-график throughput от ЭМП и частоты">
+        </figure>
+      </div>
+      <div class="bottom-callout cyan">Графики показывают не просто режим генератора, а связку: реальный уровень помехи, частота ШИМ и сетевой результат.</div>
+    </section>
+
+    <section class="slide" data-logical="31" data-part="Практика">
+      <header>
+        <p class="eyebrow">Пороговые значения</p>
+        <h2>Инженерная оценка запаса</h2>
+      </header>
+      <table class="data-table wide">
+        <thead>
+          <tr><th>Параметр</th><th>UTP Cat 5e</th><th>STP Cat 5e</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Критическое расстояние до источника</td><td>&lt;14 см</td><td>&lt;8 см</td></tr>
+          <tr><td>Рост потерь пакетов в режиме B</td><td>до 3,49%</td><td>до 1,15%</td></tr>
+          <tr><td>Снижение пропускной способности</td><td>до 3,25%</td><td>до 0,97%</td></tr>
+          <tr><td>NEXT на 100 МГц</td><td>44-54 дБ</td><td>46-58 дБ</td></tr>
+          <tr><td>Где ниже затухание</td><td>1-10 МГц</td><td>&gt;30 МГц</td></tr>
+        </tbody>
+      </table>
+      <div class="bottom-callout mint">Если источник ближе порога, UTP заметно быстрее теряет качество связи; STP дает больший запас устойчивости.</div>
+    </section>
+
+    <section class="slide" data-logical="32" data-part="Практика">
+      <header>
+        <p class="eyebrow">Финал</p>
+        <h2>Главные выводы</h2>
+      </header>
+      <ul class="conclusions-list">
+        <li><b>Разработан действующий прототип</b> автоматизированной системы тестирования устойчивости сетевого оборудования к электромагнитным помехам.</li>
+        <li><b>Стенд объединяет</b> программируемый генератор ЭМП на Arduino Leonardo, датчик поля, Python/Flet-интерфейс и визуализацию результатов.</li>
+        <li><b>STP Cat 5e показал более высокую устойчивость</b> по сравнению с UTP при одинаковом уровне внешнего воздействия.</li>
+        <li><b>Потери пакетов при максимальной помехе</b> у STP ниже примерно в 3 раза: 1,15% против 3,49% у UTP.</li>
+        <li><b>Деградация пропускной способности</b> у STP ниже более чем в 3 раза: 0,97% против 3,25% у UTP.</li>
+        <li><b>Полученные пороговые значения</b> позволяют оценивать запас помехоустойчивости кабельной линии при выборе UTP или STP.</li>
+      </ul>
+      <div class="thanks">Спасибо за внимание</div>
+    </section>
+  </main>
+
+  <nav class="controls" aria-label="Навигация по презентации">
+    <button type="button" class="nav-button" id="prev" aria-label="Предыдущий слайд">‹</button>
+    <div class="counter" id="counter">1/30</div>
+    <button type="button" class="nav-button" id="next" aria-label="Следующий слайд">›</button>
+  </nav>
+  <div class="part-label" id="partLabel">Введение</div>
+  <div class="progress"><span id="progressBar"></span></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
